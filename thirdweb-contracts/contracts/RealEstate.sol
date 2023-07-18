@@ -13,7 +13,7 @@ contract RealEstate {
         string properyAddress;
         string description;
         address[] reviewers;
-        string[] reviewer;
+        string[] reviews;
     }
 
     struct Review {
@@ -225,13 +225,83 @@ contract RealEstate {
         return items;
     }
 
-    function addReview() external {}
+    function addReview(
+        uint256 productId,
+        uint256 rating,
+        string calldata comment,
+        address user
+    ) external {
+        require(rating >= 1 && rating <= 5, "rating must be between 1 and 5");
 
-    function getProductReviews() external view returns (Review[] memory) {}
+        Property storage property = properties[productId];
 
-    function getUserReviews() external view returns (Review[] memory) {}
+        property.reviewers.push(user);
+        property.reviews.push(comment);
 
-    function likeReivew() external {}
+        reviews[productId].push(Review(user, productId, rating, comment, 0));
+        userReviews[user].push(productId);
 
-    function getHighestRatedProduct() external view returns (uint256) {}
+        products[productId].totalRating += rating;
+        products[productId].numReviews++;
+
+        emit ReviewAdded(productId, user, rating, comment);
+
+        reviewsCounter++;
+    }
+
+    function getProductReviews(
+        uint256 productId
+    ) external view returns (Review[] memory) {
+        return reviews[productId];
+    }
+
+    function getUserReviews(
+        address user
+    ) external view returns (Review[] memory) {
+        uint256 totalReviews = userReviews[user].length;
+
+        Review[] memory userProductReviews = new Review[](totalReviews);
+
+        for (uint256 i = 0; i < userReviews[user].length; i++) {
+            uint256 productId = userReviews[user][i];
+            Review[] memory productReviews = reviews[productId];
+
+            for (uint256 j = 0; j < productReviews.length; j++) {
+                if (productReviews[j].reviewer == user) {
+                    userProductReviews[i] = productReviews[j];
+                }
+            }
+        }
+        return userProductReviews;
+    }
+
+    function likeReivew(
+        uint256 productId,
+        uint256 reviewIndex,
+        address user
+    ) external {
+        Review storage review = reviews[productId][reviewIndex];
+
+        review.likes++;
+
+        emit ReviewLiked(productId, reviewIndex, user, review.likes);
+    }
+
+    function getHighestRatedProduct() external view returns (uint256) {
+        uint256 highestRating = 0;
+        uint256 highestRatedProductId = 0;
+
+        for (uint256 i = 0; i < reviewsCounter; i++){
+            uint256 productId = i + 1;
+            if(products[productId].numReviews > 0){
+                uint256 avgRating = products[productId].totalRating / products[productId].numReviews;
+
+                if (avgRating > highestRating){
+                    highestRating = avgRating;
+                    highestRatedProductId = productId;
+                }
+            }
+        }
+        return highestRatedProductId;
+    }
 }
